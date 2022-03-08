@@ -9,9 +9,16 @@ edition = "2021"
 futures = "0.3" # for our async / await blocks
 tokio = { version = "1.16.0", features = ["full"] } 
 rayon = "1.4.1"
-#walkdir = "2"
-#regex = "1"
-#jwalk = "0.5"
+walkdir = "2"
+regex = "1"
+jwalk = "0.5"
 fuzzy-matcher = "0.3.7"
 home = "0.5.3"
 clap = { version = "3.1.5", features = ["derive"] }
+async-recursion = "1.0.0"
+colored = "2"
+
+
+[profile.dev]
+opt-level = 0
+panic = 'unwind'

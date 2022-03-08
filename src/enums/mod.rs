@@ -1,6 +1,14 @@
-
 #[allow(unused)]
 pub mod enums {
+
+    #[derive(Debug, PartialEq, Copy, Clone, Eq)]
+    pub enum SearchType{
+        Contains,
+        Fuzzy,
+        None,
+        Pattern,
+        Simple, 
+    }
 
     #[derive(Debug, PartialEq, Copy, Clone, Eq)]
     pub enum FileAction {
@@ -12,22 +20,18 @@ pub mod enums {
 
     #[derive(Debug, PartialEq, Copy, Clone, Eq)]
     pub enum FileType {
-        Image,
+        All,
         Audio,
-        Video,
         Document,
+        Empty,
+        Image,
         Other,
-        None, 
-        All
+        Video,
     }
 
     #[derive(Debug, PartialEq, Clone, Copy, Eq)]
-    pub enum MetaData<'a > {
+    pub enum MetaData<'a> {
         FileSize(i32),
-        Created(&'a str), 
+        Created(&'a str),
     }
-
-    
 }
-
- 

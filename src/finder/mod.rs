@@ -1,192 +1,194 @@
 pub mod finder {
 
     use crate::enums::enums::*;
+    use async_recursion::async_recursion;
+    use futures::TryFutureExt;
     use fuzzy_matcher::skim::SkimMatcherV2;
     use fuzzy_matcher::FuzzyMatcher;
+    use home::home_dir;
+    use jwalk::WalkDir;
     use rayon::prelude::*;
     use std::ffi::OsStr;
+    use std::fs::metadata;
     use std::path::PathBuf;
     use std::sync::{Arc, Mutex};
     use std::time::Instant;
     use tokio::{fs, join};
 
+    use futures::{stream, Stream, StreamExt}; // 0.3.1
+    use std::io;
+    use tokio::fs::DirEntry;
+
     #[derive(Debug, Clone)]
-    pub struct Meta {
-        name: String,
-        path: String,
+    pub struct Found {
+        pub name: String,
+        pub path: String,
     }
 
     #[derive(Debug, Clone)]
     pub struct Finder<'a> {
         pub directory: Option<&'a str>,
-        pub fuzzy_search: Option<&'a str>,
-        pub list: Vec<Meta>,
+        pub search_pattern: Option<&'a str>,
+        pub search_type: SearchType,
+        pub flag_skip_hidden: bool,
+        pub flag_skip_photos: bool,
+        pub list: Vec<Found>,
+        pub thread_count: i32,
     }
 
+    #[allow(unused)]
     impl<'a> Finder<'a> {
         pub fn new() -> Finder<'a> {
             Finder {
                 directory: None,
-                fuzzy_search: None,
+                flag_skip_hidden: true,
+                flag_skip_photos: true,
                 list: vec![],
+                search_pattern: None,
+                search_type: SearchType::None,
+                thread_count: 25,
             }
         }
-        pub fn rayon_walk_dir(&mut self, path: &str, filter: [bool; 7]) {
-            let start = Instant::now();
+
+        pub fn fast_walk_dir(&mut self, path: &str, filter: [bool; 7]) {
             //
-            // Flags - hidden directory,
+            //flag --hidden ::checked::required
+            //flag --skip_photos ::checked
+            //option --file_type ::checked::required; FileType
+            //option --match pattern: checked; SearchType
+            //option --threads ::checked
             //
-            //
-            fn read_dir(
-                entries: Arc<Mutex<Vec<(String, String)>>>,
-                s: &rayon::Scope<'_>,
-                base_path: PathBuf,
-                filter: [bool; 7],
-            ) {
-                //Works Belows
-                let bp = base_path.clone();
-                let temp = base_path.file_name().unwrap();
-                //let path: String = String::from(temp.to_string_lossy());
 
-                for entry in std::fs::read_dir(bp).unwrap_or_else(|e| {
-                    panic!("Error reading dir: {:?}, {}", temp, e);
-                }) {
-                    let entry = entry;
+            //self.flag_skip_hidden
+            for dir_entry_result in jwalk::WalkDirGeneric::<((), Option<u64>)>::new(&path)
+                .skip_hidden(self.flag_skip_hidden)
+                .parallelism(jwalk::Parallelism::RayonNewPool(
+                    self.thread_count.try_into().unwrap(),
+                ))
+                .process_read_dir(|_, dir_entry_results| {})
+            {
+                //let regex = regex::Regex::new(self.search_pattern.unwrap()).unwrap(); 
+                //println!("self.flag_skip_hidden...{}", self.flag_skip_hidden);
+                match dir_entry_result {
+                    Ok(dir_entry) => {
 
-                    match &entry {
-                        Ok(ent) => {
-                            let entry = entry.unwrap();
-                            let path = entry.path();
+                        let path: String = dir_entry.path().as_path().display().to_string(); 
+                        let mut flag_continue = true;
+                      
+                        //1 -- flag skip_photos
+                        if self.flag_skip_photos {
+                            let photos = String::from("/Pictures/Photos Library.photoslibrary");
+                            let user_home =
+                                home::home_dir().unwrap().as_path().display().to_string();
 
-                            // Flags - hidden directory,
-                            if !path.starts_with(".") {
-                                let metadata = entry.metadata().unwrap();
-
-                                if metadata.is_dir() {
-                                    let move_entries = entries.clone();
-                                    s.spawn(move |s1| read_dir(move_entries, s1, path, filter));
-                                } else if metadata.is_file() {
-                                    let p = path.as_path().display().to_string();
-
-                                    let ft = Finder::get_file_type(&p);
-                                    let mut flag_continue = false;
-                                    match ft {
-                                        FileType::Audio => {
-                                            if filter[0] {
-                                                flag_continue = true;
-                                            }
-                                        }
-                                        FileType::Document => {
-                                            if filter[1] {
-                                                flag_continue = true;
-                                            }
-                                        }
-                                        FileType::Image => {
-                                            if filter[2] {
-                                                flag_continue = true;
-                                            }
-                                        }
-                                        FileType::Other => {
-                                            if filter[3] {
-                                                flag_continue = true;
-                                            }
-                                        }
-                                        FileType::Video => {
-                                            if filter[4] {
-                                                flag_continue = true;
-                                            }
-                                        }
-                                        FileType::None => {
-                                            if filter[5] {
-                                                flag_continue = true;
-                                                println!("{}", p);
-                                            }
-                                        }
-                                        FileType::All => {
-                                            if filter[6] {
-                                                flag_continue = true;
-                                            }
-                                        }
-                                    }
-
-                                    if flag_continue {
-                                        let async_results = Finder::async_file_metadata_join(&p);
-                                        let x = futures::executor::block_on(async_results);
-
-                                        entries.lock().unwrap().push(x);
-                                    }
-                                }
+                            let joined = [user_home, photos].join("");
+                            if path == joined {
+                                println!("Skipping Photos Library...{}", path);
+                                flag_continue = false;
+                                //enum
                             }
                         }
-                        Err(e) => {
-                            println!("{:?}", &entry);
-                            println!("####################{}", e);
-                        }
-                    }
-                }
-            }
 
-            //*************************************************************************************************************************//
-            pub fn walk_files(
-                base_path: &std::path::Path,
-                filter: [bool; 7],
-            ) -> std::vec::Vec<(String, String)> {
-                let entries = Arc::new(Mutex::new(Vec::new()));
+                        if flag_continue {
+                            if !dir_entry.file_type.is_dir() {
+                                let path: String = dir_entry.path().as_path().display().to_string();
 
-                let base_path = base_path.to_owned();
-                let move_entries = entries.clone();
-                let ret = rayon::scope(move |s| {
-                    s.spawn(move |s1| read_dir(move_entries, s1, base_path, filter))
-                });
-
-                let entries = Arc::try_unwrap(entries).unwrap().into_inner().unwrap();
-                entries
-            }
-            //*************************************************************************************************************************//
-
-            let path = std::path::Path::new(path);
-            let flag = !path.starts_with(".");
-            if flag {
-                let mut list = walk_files(path, filter);
-                //println!("{:#?}", list);
-
-                for item in list {
-                    let metadata = std::fs::metadata(&item.1); //unwrap()
-                    match metadata {
-                        Ok(md) => {
-                            if !md.is_dir() {
-                                //Continue if FileType equals "...."
-                                /* if flag_continue == true {}
-                                 */
-
-                                let matcher = SkimMatcherV2::default();
-                                //matcher.simple_match(choice, pattern, first_match_indices, false, false)
-                                let res = matcher.fuzzy_match(&item.0, &self.fuzzy_search.unwrap());
-                                match res {
+                                //2 -- option flag_type
+                                let x = self.filter_file_type(&path, filter);
+                                match x {
                                     Some(_) => {
-                                        let x = item.clone();
-                                        self.list.push(Meta {
-                                            name: x.0,
-                                            path: x.1,
-                                        })
+                                        //3 -- option pattern match
+                                        let x = self.filter_pattern_match(&path, filter);
+                                        match x {
+                                            Some(_) => {
+                                                //println!("Option<String>::{:#?}", x);
+                                                let name = dir_entry
+                                                    .path()
+                                                    .file_name()
+                                                    .unwrap()
+                                                    .to_str()
+                                                    .unwrap()
+                                                    .to_ascii_lowercase();
+
+                                                self.list.push(Found {
+                                                    name: name,
+                                                    path: path,
+                                                })
+                                            }
+                                            None => {}
+                                        }
                                     }
                                     None => {}
                                 }
                             }
                         }
-                        Err(_) => {
-                            println!("Some big error here. but does the program exit???")
-                        }
+                    }
+                    Err(error) => {
+                        println!("Read dir_entry error: {}", error);
                     }
                 }
             }
+        }
 
-            let duration = start.elapsed();
-            println!("duration::{:#?}", duration);
+        pub fn stream_paths(
+            &mut self,
+            path: impl Into<PathBuf>,
+        ) -> impl Stream<Item = io::Result<DirEntry>> + Send + 'static {
+            //
+            async fn one_level(
+                path: PathBuf,
+                to_visit: &mut Vec<PathBuf>,
+            ) -> io::Result<Vec<DirEntry>> {
+                let mut dir = fs::read_dir(path).await?;
+                let mut files = Vec::new();
+
+                let regex = regex::Regex::new("minty").unwrap();
+
+                while let Some(child) = dir.next_entry().await? {
+                    let path = child.path().to_str().unwrap().to_owned();
+                    let name = child
+                        .path()
+                        .as_path()
+                        .file_name()
+                        .unwrap()
+                        .to_str()
+                        .unwrap()
+                        .to_owned();
+
+                    //flag --hidden
+                    //
+                    //
+
+                    if child.metadata().await?.is_dir() {
+                        if name.starts_with('.') {
+                            // do nothing
+                        } else {
+                            to_visit.push(child.path());
+                        }
+                    } else {
+                        let found = regex.captures(&name);
+                        match found {
+                            Some(_) => files.push(child),
+                            None => {}
+                        }
+                    }
+                }
+
+                Ok(files)
+            }
+
+            stream::unfold(vec![path.into()], |mut to_visit| async {
+                let path = to_visit.pop()?;
+                let file_stream = match one_level(path, &mut to_visit).await {
+                    Ok(files) => stream::iter(files).map(Ok).left_stream(),
+                    Err(e) => stream::once(async { Err(e) }).right_stream(),
+                };
+
+                Some((file_stream, to_visit))
+            })
+            .flatten()
         }
-        pub fn walk_dir(&mut self, path: &str, filter: [bool;7]){
-            
-        }
+
         async fn async_file_metadata_join(path: &str) -> (String, String) {
             //// -1
             let fno = get_file_name_os(path);
@@ -208,15 +210,20 @@ pub mod finder {
 
             join!(fno, fpo)
         }
+
         fn get_file_type(path: &str) -> crate::enums::enums::FileType {
             let ext = std::path::Path::new(&path)
                 .extension()
                 .and_then(OsStr::to_str);
 
             match ext {
-                None => return FileType::None,
+                None => {
+                    //println!("ext:: {:?}", &path);
+                    return crate::enums::enums::FileType::Empty;
+                }
                 Some(_) => {
                     let ext = ext.unwrap().to_lowercase();
+
                     match ext.as_str() {
                         "jpg" | "png" | "heic" | "jpeg" | "tiff" | "tif" | "psd" | "tga"
                         | "thm" | "dds" => return FileType::Image,
@@ -233,11 +240,103 @@ pub mod finder {
                     };
                 }
             }
+        }
 
-            //println!("get_file_type)_ ::{}", &path);
-            let ext = ext.unwrap().to_lowercase();
+        pub fn filter_pattern_match(&mut self, path: &str, filter: [bool; 7]) -> Option<String> {
+            let name = std::path::Path::new(&path)
+                .file_name()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .to_string();
+
+            match self.search_pattern {
+                Some(pattern) => match self.search_type {
+                    SearchType::Contains => {
+                        if name.contains(self.search_pattern.unwrap()) {
+                            Some(path.to_string())
+                        } else {
+                            None
+                        }
+                    }
+                    SearchType::Fuzzy => {
+                        let matcher = SkimMatcherV2::default();
+                        let res = matcher.fuzzy_match(&path, &self.search_pattern.unwrap());
+                        match res {
+                            Some(_) => Some(path.to_string()),
+                            None => None,
+                        }
+                    }
+                    SearchType::Pattern => {
+                        let regex = regex::Regex::new(pattern).unwrap();
+                        let found = regex.captures(&name);
+                        match found {
+                            Some(_) => Some(path.to_string()),
+                            None => None,
+                        }
+                    }
+                    SearchType::Simple => {
+                        if name == self.search_pattern.unwrap() {
+                            Some(path.to_string())
+                        } else {
+                            None
+                        }
+                    }
+                    SearchType::None => Some(path.to_string()),
+                },
+                None => None,
+            }
+        }
+
+        pub fn filter_file_type(&mut self, path: &str, filter: [bool; 7]) -> Option<String> {
+            //Return if filter[6] (ALL) is true
+            if filter[0] {
+                return Some(path.to_string());
+            }
+
+            let pattern = Finder::get_file_type(&path);
+            match pattern {
+                FileType::All => {
+                    if filter[0] {
+                        return Some(path.to_string());
+                    }
+                }
+                FileType::Audio => {
+                    if filter[1] {
+                        return Some(path.to_string());
+                    }
+                }
+                FileType::Document => {
+                    if filter[2] {
+                        return Some(path.to_string());
+                    }
+                }
+                FileType::Empty => {
+                    if filter[3] {
+                        return Some(path.to_string());
+                    }
+                }
+                FileType::Image => {
+                    if filter[4] {
+                        return Some(path.to_string());
+                    }
+                }
+                FileType::Other => {
+                    if filter[5] {
+                        return Some(path.to_string());
+                    }
+                }
+                FileType::Video => {
+                    if filter[6] {
+                        return Some(path.to_string());
+                    }
+                }
+            } 
+            None
         }
     }
+
+    //Helpers
     async fn get_file_name_os(path: &str) -> String {
         let name = std::path::Path::new(&path)
             .file_name()
@@ -249,9 +348,15 @@ pub mod finder {
     async fn get_file_path_os(path: &str) -> String {
         path.to_string()
     }
-
     //Helpers
     pub fn type_of<T>(_: T) -> &'static str {
         std::any::type_name::<T>()
     }
 }
+
+//#[async_recursion]
+// -> Result<String, Box<dyn Error>>
+// -> Result<(), std::io::Error>
+// -> Box<dyn futures::Future<Output = ()>>
+// -> Result<tokio::fs::ReadDir, Box<dyn std::error::Error>>
+// -> Result<String, Box<dyn std::error::Error>>
