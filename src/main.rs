@@ -8,7 +8,12 @@ use crate::finder::finder::Found;
 
 #[tokio::main]
 async fn main() {
+
     let mut ff = finder::finder::Finder::new();
+    ff.search_type = enums::enums::SearchType::Contains;
+    ff.flag_skip_hidden = true;
+    ff.thread_count = 35;
+
     let default_path = home::home_dir().unwrap().as_path().display().to_string();
 
     let mut directory: &str = "";
@@ -41,11 +46,32 @@ async fn main() {
         )
         .arg(
             //Option
-            Arg::new("file type")
+            Arg::new("file_type")
                 .long("file_type")
                 .short('f')
                 .help("To filter the search by file type -\nAll, Audio, Document, Empty, Image, Other, Video")
                 .takes_value(true)
+                .default_value("0")
+                .required(false) 
+        )
+        .arg(
+            //Option
+            Arg::new("search_type")
+                .long("search_type")
+                .short('s')
+                .help("Search Algorithm Type -\nContains Text, Fuzzy Search, Pattern Match, Simple Match")
+                .takes_value(true)
+                .default_value("0")
+                .required(false) 
+        )
+        .arg(
+            //Option
+            Arg::new("threads")
+                .long("threads")
+                .short('t')
+                .help("Number of threads to use in parrellism")
+                .takes_value(true)
+                .default_value("35")
                 .required(false) 
         )
         .arg(
@@ -83,9 +109,43 @@ async fn main() {
         }
     }
 
+    //Option::Threads
+    if matches.is_present("threads") {
+        if let Some(val) = matches.value_of("threads") {
+            ff.thread_count = val.parse().unwrap();
+        }
+    }
+
+    //Option::Search Type
+    if matches.is_present("search_type"){
+        if let Some(val) = matches.value_of("search_type") {
+    
+            for c in val.chars(){
+                match Some(c) {
+                    Some('0') => {
+                        ff.search_type = enums::enums::SearchType::Contains;
+                    },
+                    Some('1') => {
+                        ff.search_type = enums::enums::SearchType::Fuzzy;
+                    },
+                    Some('2') => {
+                        ff.search_type = enums::enums::SearchType::Pattern;
+                    },
+                    Some('3') => {
+                        ff.search_type = enums::enums::SearchType::Simple;
+                    },
+                    None => todo!(),
+                    Some(_) => {} 
+                } 
+            } 
+        }
+    } else {
+        filter[0] = true; //traverse all extensions
+    }
+
     //Option::File Type
-    if matches.is_present("file type"){
-        if let Some(val) = matches.value_of("file type") {
+    if matches.is_present("file_type"){
+        if let Some(val) = matches.value_of("file_type") {
     
             for c in val.chars(){
                 match Some(c) {
@@ -123,14 +183,7 @@ async fn main() {
     let start = std::time::Instant::now();
 
     ff.directory = Some(&*directory);
-    ff.search_pattern = Some(&*pattern);
-    ff.search_type = enums::enums::SearchType::Contains;
-
-     
-     
-
-    ff.flag_skip_hidden = true;
-    ff.thread_count = 35;
+    ff.search_pattern = Some(&*pattern); 
     ff.fast_walk_dir(&ff.directory.unwrap(), filter); //1.159
 
     let x = ff.list;
