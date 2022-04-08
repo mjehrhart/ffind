@@ -1,5 +1,5 @@
 # ffind
-Fast Find is a cli written in rust using rayon parrellism for super fast results.
+Fast Find is a cli written in rust using rayon parrellism for super fast results. This is faster than the standard 'find' command. FFind is built to be simple to use, superior speed, and return extremly reliable results.
 
 ## Install ffind
 
@@ -33,17 +33,17 @@ brew upgrade mjehrhart/ff/ff
 
 ## Examples
 
-Basic usage. This will search the home directory, minus the Photos Library.photoslibrary. The user's Photos Library is ignored by default as are hidden files.  You can select a flag to include Photos Library and hidden files.  
+Basic usage. This will search the home directory, minus the Photos Library.photoslibrary. The user's Photos Library is ignored by default as are hidden files.  You can set a flag to include Photos Library(-p) and hidden files(-h).  
 ```
 ff minty
 ```
 
-To perform a search in the current directory, add '.' to the command.
+To perform a search in the current working directory add '.' at the end of the command.
 ```
 ff minty .
 ```
 
-You can search by file type as well. This helps especially useful when working with large data sets or images.  
+Also, you can search by file type. This is especially useful when working with large data sets or images.  
 
 Search by media type.   
     All => 0  
@@ -54,6 +54,7 @@ Search by media type.
     Other => 5  
     Video => 6  
 
+Below we are searching for the word 'beethoven' (case insensitive) in all audio file names'.
 ```
 ff beethoven -f 1
 ```
