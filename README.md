@@ -70,3 +70,5 @@ ff minty -t 1000
 
 <img width="100%" alt="Screen Shot Fast Find" src="https://user-images.githubusercontent.com/97703291/162533499-b87a387e-1663-4d90-8556-2e0a2084fa2f.png">
  
+crates.io https://crates.io/crates/fast_finder   
+github.com https://github.com/mjehrhart/ffind   
