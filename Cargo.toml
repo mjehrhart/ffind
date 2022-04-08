@@ -2,6 +2,11 @@
 name = "ffind"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+repository = "https://github.com/mjehrhart/ffind"
+description = "Fast Find is a cli written in rust using rayon parrellism for super fast results."
+keywords = ["search", "file", "filesystem", "tool", "find"]
+
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
