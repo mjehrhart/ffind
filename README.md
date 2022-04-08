@@ -5,7 +5,7 @@ Fast Finder is a cli written in rust using rayon parrellism for super fast resul
 
 ```
 brew tap mjehrhart/ff
-install mjehrhart/ff/ff
+brew install mjehrhart/ff/ff
 ```
 
 ## Update/Upgrade
