@@ -17,7 +17,7 @@ brew upgrade mjehrhart/ff/ff
 ![ff4](https://user-images.githubusercontent.com/97703291/162531806-c9607850-fa7b-4db9-8983-54bea7e0844c.gif)
 
 
-## Args & Parameters 
+## Args, Flags, & Parameters 
 ```
 -f, --file_type <file_type>        To filter the search by file type -
                                    All, Audio, Document, Empty, Image, Other, Video [default: 0]
