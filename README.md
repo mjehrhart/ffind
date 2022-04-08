@@ -1,7 +1,7 @@
-# ffind
-Fast Find is a cli written in rust using rayon parrellism for super fast results. This is faster than the standard 'find' command. FFind is built to be simple to use, superior speed, and return extremly reliable results.
+# ffinder
+Fast Finder is a cli written in rust using rayon parrellism for super fast results. This is faster than the standard 'find' command. FFinder is built to be simple to use, superior speed, and return extremly reliable results.
 
-## Install ffind
+## Install ffinder
 
 ```
 brew tap mjehrhart/ff
@@ -59,7 +59,7 @@ Below we are searching for the word 'beethoven' (case insensitive) in all audio 
 ff beethoven -f 1
 ```
  
-The user can set the number of threads to use. Fast Find uses Rayon Parrellism for very fast lookups.
+The user can set the number of threads to use. Fast Finder uses Rayon Parrellism for very fast lookups.
 ```
 ff minty -t 1000
 ```
