@@ -13,3 +13,5 @@ install mjehrhart/ff/ff
 brew reinstall mjehrhart/ff/ff
 brew upgrade mjehrhart/ff/ff
 ```
+ 
+![ff3](https://user-images.githubusercontent.com/97703291/162528509-8d7d4968-a8cb-4451-bf9b-bf2f12b2fffb.gif)
